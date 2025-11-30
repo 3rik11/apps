@@ -6,6 +6,8 @@ from time import sleep
 import RPi.GPIO as GPIO
 import os
 
+os.system("gpiochip0 release 17 27 22")
+
 # -------------------------
 # OLED setup
 # -------------------------
@@ -79,3 +81,4 @@ def countdown_to_christmas():
         sleep(1)
 
 countdown_to_christmas()
+
