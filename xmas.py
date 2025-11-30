@@ -3,10 +3,8 @@ from luma.oled.device import ssd1306
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
 from time import sleep
-import RPi.GPIO as GPIO
 import os
-
-os.system("gpiochip0 release 17 27 22")
+import lgpio
 
 # -------------------------
 # OLED setup
@@ -18,26 +16,34 @@ device = ssd1306(serial, width=128, height=64)
 font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
 
 # -------------------------
-# GPIO setup for buttons
+# lgpio button setup
 # -------------------------
 BUTTON_UP = 17
 BUTTON_DOWN = 27
-BUTTON_SELECT = 22  # reboot trigger
+BUTTON_SELECT = 22
 
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(BUTTON_UP, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(BUTTON_DOWN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(BUTTON_SELECT, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+chip = lgpio.gpiochip_open(0)
 
-# -------------------------
-# Helper: wait for select press
-# -------------------------
+# claim pins as inputs with pull-ups
+lgpio.gpio_claim_input(chip, BUTTON_UP, lgpio.SET_PULL_UP)
+lgpio.gpio_claim_input(chip, BUTTON_DOWN, lgpio.SET_PULL_UP)
+lgpio.gpio_claim_input(chip, BUTTON_SELECT, lgpio.SET_PULL_UP)
+
+def get_button():
+    if lgpio.gpio_read(chip, BUTTON_UP) == 0:
+        return "UP"
+    if lgpio.gpio_read(chip, BUTTON_DOWN) == 0:
+        return "DOWN"
+    if lgpio.gpio_read(chip, BUTTON_SELECT) == 0:
+        return "SELECT"
+    return None
+
 def check_reboot_button():
-    """If SELECT is pressed, reboot the Pi."""
-    if GPIO.input(BUTTON_SELECT) == GPIO.LOW:
-        os.system("sudo reboot")
-        while True:
-            pass  # prevent continuing code
+    """Reboot Pi if SELECT is pressed."""
+    if lgpio.gpio_read(chip, BUTTON_SELECT) == 0:
+        show("Rebooting...", "")
+        sleep(1)
+        os.system("sudo reboot now")
 
 # -------------------------
 # Display helper
@@ -54,7 +60,7 @@ def show(text1, text2=""):
 # -------------------------
 def countdown_to_christmas():
     while True:
-        check_reboot_button()  # check every loop
+        check_reboot_button()
 
         now = datetime.now()
         year = now.year
@@ -81,4 +87,3 @@ def countdown_to_christmas():
         sleep(1)
 
 countdown_to_christmas()
-
