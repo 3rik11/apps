@@ -3,34 +3,66 @@ from luma.oled.device import ssd1306
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
 from time import sleep
+import RPi.GPIO as GPIO
+import os
 
-# Setup I2C
+# -------------------------
+# OLED setup
+# -------------------------
 serial = i2c(port=1, address=0x3C)
 device = ssd1306(serial, width=128, height=64)
 
 # Font
 font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
 
+# -------------------------
+# GPIO setup for buttons
+# -------------------------
+BUTTON_UP = 17
+BUTTON_DOWN = 27
+BUTTON_SELECT = 22  # reboot trigger
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(BUTTON_UP, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(BUTTON_DOWN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(BUTTON_SELECT, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# -------------------------
+# Helper: wait for select press
+# -------------------------
+def check_reboot_button():
+    """If SELECT is pressed, reboot the Pi."""
+    if GPIO.input(BUTTON_SELECT) == GPIO.LOW:
+        os.system("sudo reboot")
+        while True:
+            pass  # prevent continuing code
+
+# -------------------------
+# Display helper
+# -------------------------
 def show(text1, text2=""):
     image = Image.new("1", (device.width, device.height))
     draw = ImageDraw.Draw(image)
-
     draw.text((0, 0), text1, font=font, fill=255)
     draw.text((0, 25), text2, font=font, fill=255)
-
     device.display(image)
 
+# -------------------------
+# Christmas Countdown Loop
+# -------------------------
 def countdown_to_christmas():
     while True:
+        check_reboot_button()  # check every loop
+
         now = datetime.now()
         year = now.year
 
-        # If Christmas already passed this year, use next year
-        christmas = datetime(year, 12, 25, 0, 0, 0)
+        # Determine correct Christmas date
+        christmas = datetime(year, 12, 25)
         if now > christmas:
-            christmas = datetime(year + 1, 12, 25, 0, 0, 0)
+            christmas = datetime(year + 1, 12, 25)
 
-        # Difference
+        # Time remaining
         diff = christmas - now
 
         days = diff.days
@@ -40,7 +72,7 @@ def countdown_to_christmas():
 
         # Display
         show(
-            f"Christmas in:",
+            "Christmas in:",
             f"{days}d {hours}h {minutes}m {seconds}s"
         )
 
