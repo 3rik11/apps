@@ -3,7 +3,7 @@ from luma.oled.device import ssd1306
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
 from time import sleep
-import os
+import lgpio
 
 # -------------------------
 # OLED setup
@@ -13,6 +13,30 @@ device = ssd1306(serial, width=128, height=64)
 
 # Font
 font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+
+# -------------------------
+# GPIO setup (safe claim)
+# -------------------------
+BUTTON_UP = 17
+
+chip = lgpio.gpiochip_open(0)
+
+def safe_claim(pin):
+    try:
+        lgpio.gpio_claim_input(chip, pin, lgpio.SET_PULL_UP)
+    except lgpio.error as e:
+        if "busy" in str(e):
+            # Pin already claimed by this process → ignore
+            pass
+        else:
+            raise
+
+# Claim the UP button safely
+safe_claim(BUTTON_UP)
+
+def button_pressed():
+    """Return True if UP button is pressed."""
+    return lgpio.gpio_read(chip, BUTTON_UP) == 0
 
 # -------------------------
 # Display helper
@@ -29,6 +53,9 @@ def show(text1, text2=""):
 # -------------------------
 def countdown_to_christmas():
     while True:
+        if button_pressed():
+            show("Countdown stopped", "")
+            break  # Stop the loop if UP button is pressed
 
         now = datetime.now()
         year = now.year
@@ -40,7 +67,6 @@ def countdown_to_christmas():
 
         # Time remaining
         diff = christmas - now
-
         days = diff.days
         hours = diff.seconds // 3600
         minutes = (diff.seconds % 3600) // 60
@@ -54,5 +80,8 @@ def countdown_to_christmas():
 
         sleep(1)
 
+# -------------------------
+# Run countdown
+# -------------------------
 countdown_to_christmas()
 
